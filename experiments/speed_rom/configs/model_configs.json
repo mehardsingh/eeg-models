@@ -1,0 +1,24 @@
+{
+    "gtn": {
+        "architecture": {
+            "d_model": 512,
+            "d_input": 501,
+            "d_channel": 4,
+            "d_output": 2,
+            "d_hidden": 1024,
+            "q": 8,
+            "v": 8,
+            "h": 8,
+            "N": 8,
+            "dropout": 0.2,
+            "pe": true,
+            "mask": false
+        },
+        "training": {
+            "lr": 0.0001,
+            "optimizer": "adagrad",
+            "lr_decay": "plateau",
+            "batch_size": 16
+        }
+    }
+}

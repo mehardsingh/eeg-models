@@ -1,0 +1,6 @@
+{
+    "data_dir": "data/speed_rom",
+    "motion_type": "Disc",
+    "k": 4,
+    "val_percent": 0.15
+}
