@@ -1,20 +1,27 @@
-from torch.nn import Module
-import torch
-import torch.nn.functional as F
+# @Time    : 2021/07/21 19:28
+# @Author  : SY.M
+# @FileName: feedforward.py
 
-class FeedForward(Module):
+import torch
+
+
+class PositionFeedforward(torch.nn.Module):
     def __init__(self,
                  d_model: int,
-                 d_hidden: int = 512):
-        super(FeedForward, self).__init__()
+                 d_hidden: int = 2048):
+        super(PositionFeedforward, self).__init__()
 
-        self.linear_1 = torch.nn.Linear(d_model, d_hidden)
-        self.linear_2 = torch.nn.Linear(d_hidden, d_model)
+        self.linear1 = torch.nn.Linear(in_features=d_model, out_features=d_hidden)
+        self.linear2 = torch.nn.Linear(in_features=d_hidden, out_features=d_model)
+        self.relu = torch.nn.ReLU()
+        self.layernorm = torch.nn.LayerNorm(normalized_shape=d_model)
 
     def forward(self, x):
 
-        x = self.linear_1(x)
-        x = F.relu(x)
-        x = self.linear_2(x)
+        residual = x
+        x = self.linear1(x)
+        x = self.relu(x)
+        x = self.linear2(x)
+        x = self.layernorm(x + residual)
 
         return x

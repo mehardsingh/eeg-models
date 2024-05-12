@@ -1,51 +1,55 @@
-from torch.nn import Module
+# @Time    : 2021/07/21 19:29
+# @Author  : SY.M
+# @FileName: multiHeadAttention.py
+
+
 import torch
-import math
-import torch.nn.functional as F
 
 
-class MultiHeadAttention(Module):
+class MultiHeadAttention(torch.nn.Module):
+
     def __init__(self,
                  d_model: int,
                  q: int,
                  v: int,
-                 h: int,
-                 mask: bool=False,
-                 dropout: float = 0.1):
+                 h: int):
         super(MultiHeadAttention, self).__init__()
 
-        self.W_q = torch.nn.Linear(d_model, q * h)
-        self.W_k = torch.nn.Linear(d_model, q * h)
-        self.W_v = torch.nn.Linear(d_model, v * h)
+        self.h = h
+        self.q = q
 
-        self.W_o = torch.nn.Linear(v * h, d_model)
+        self.W_Q = torch.nn.Linear(in_features=d_model, out_features=q * h)
+        self.W_K = torch.nn.Linear(in_features=d_model, out_features=q * h)
+        self.W_V = torch.nn.Linear(in_features=d_model, out_features=v * h)
+        self.W_out = torch.nn.Linear(in_features=v * h, out_features=d_model)
 
-        self._h = h
-        self._q = q
+        self.inf = -2**32+1
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
 
-        self.mask = mask
-        self.dropout = torch.nn.Dropout(p=dropout)
-        self.score = None
+    def forward(self,
+                x: torch.Tensor):
 
-    def forward(self, x):
-        Q = torch.cat(self.W_q(x).chunk(self._h, dim=-1), dim=0)
-        K = torch.cat(self.W_k(x).chunk(self._h, dim=-1), dim=0)
-        V = torch.cat(self.W_v(x).chunk(self._h, dim=-1), dim=0)
+        Q = torch.cat(self.W_Q(x).chunk(self.h, dim=-1), dim=0)
+        K = torch.cat(self.W_K(x).chunk(self.h, dim=-1), dim=0)
+        V = torch.cat(self.W_V(x).chunk(self.h, dim=-1), dim=0)
 
-        score = torch.matmul(Q, K.transpose(-1, -2)) / math.sqrt(self._q)
-        self.score = score
+        score = torch.matmul(Q, K.transpose(-1, -2))  # / torch.sqrt(torch.Tensor(self.q)).to(self.device)
 
-        if self.mask and self.training:
+        heatmap_score = score
+
+        if self.training:
             mask = torch.ones_like(score[0])
-            mask = torch.tril(mask, diagonal=0)
-            score = torch.where(mask > 0, score, torch.Tensor([-2**32+1]).expand_as(score[0]).to(x.device))
+            mask = mask.tril(diagonal=0)
+            score = torch.where(mask > 0, score, (torch.ones_like(mask) * self.inf).to(self.device))
 
-        score = F.softmax(score, dim=-1)
+        score = torch.nn.functional.softmax(score, dim=-1)
+        weight_V = torch.cat(torch.matmul(score, V).chunk(self.h, dim=0), dim=-1)
 
-        attention = torch.matmul(score, V)
+        out = self.W_out(weight_V)
 
-        attention_heads = torch.cat(attention.chunk(self._h, dim=0), dim=-1)
-
-        self_attention = self.W_o(attention_heads)
-
-        return self_attention, self.score
+        return out, heatmap_score
